@@ -1,0 +1,56 @@
+# Template to create development machine in AWS. Uses pre-baked AMI.
+provider "aws" {
+  region     = "eu-west-2"
+}
+
+resource "aws_instance" "example" {
+  ami           = "ami-f976839e"
+  instance_type = "t2.micro"
+  key_name = "EGAR"
+  root_block_device {
+    volume_type="gp2"
+    volume_size="20"
+    delete_on_termination = "true"
+    }
+  tags {
+    Name = "${MACHINE_NAME}"
+    project = "Gitlab-Civica"
+    gitlab = "ec2"
+    Owner = "Bill"
+  }
+
+  connection {
+    type = "ssh"
+    user = "ec2-user"
+    private_key = "${file("EGAR.pem")}"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum -y install docker",
+      "sudo curl -L https://github.com/docker/compose/releases/download/1.22.0/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose",
+      "sudo chmod 775 /usr/local/bin/docker-compose",
+      "sudo yum -y install git",
+      "sudo chkconfig docker on",
+      "sudo service docker start",
+      "sudo setenforce 0",
+      "sudo git clone https://github.com/billhartcivica/gitlab.git",
+      "sudo mkdir /srv/gitlab",
+      "sudo mkdir /srv/gitlab/config",
+      "sudo mkdir /srv/gitlab/data",
+      "sudo mkdir /srv/gitlab/logs",
+      "sudo chmod 777 /srv/gitlab/config",
+      "sudo chmod 777 /srv/gitlab/data",
+      "sudo chmod 777 /srv/gitlab/logs"
+      ]
+  }
+}
+
+resource "aws_eip" "ip" {
+  instance = "${aws_instance.example.id}"
+}
+
+output "ip" {
+  value = "${aws_eip.ip.public_ip}"
+}
+
